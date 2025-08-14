@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Sheet Merger</title>
+    <!-- Tailwind CSS for a clean, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Custom scrollbar for header list */
+        .header-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .header-list-container::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 10px;
+        }
+        .header-list-container::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+        /* Custom scrollbar for preview table */
+        .preview-table-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .preview-table-container::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 10px;
+        }
+        .preview-table-container::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+        .animate-pulse-fast {
+            animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+
+        .draggable-item {
+            cursor: grab;
+        }
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+        .draggable-item.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+        .draggable-item.over {
+            outline: 2px dashed #8b5cf6;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white rounded-3xl shadow-xl p-6 sm:p-10 w-full max-w-4xl border border-gray-200">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-2">Excel Sheet Merger 📊</h1>
+        <p class="text-center text-gray-500 mb-8 text-sm sm:text-base">Upload your Excel files, select a primary key, and merge your sheets.</p>
+
+        <!-- File Upload Section -->
+        <div class="mb-8">
+            <label for="excel-files" class="block text-gray-700 font-semibold mb-2">
+                Step 1: Upload Excel Files
+            </label>
+            <input type="file" id="excel-files" multiple accept=".xlsx, .xls"
+                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4
+                       file:rounded-full file:border-0 file:text-sm file:font-semibold
+                       file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 cursor-pointer"/>
+        </div>
+
+        <!-- Selected Headers Section -->
+        <div id="header-selection-container" class="mb-8 hidden">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
+                Step 2: Select Headers
+            </h2>
+            
+            <!-- Primary Key Selection -->
+            <div class="mb-6">
+                <label for="primary-key-select" class="block text-gray-700 font-semibold mb-2">
+                    Select a Primary Key Column
+                </label>
+                <select id="primary-key-select" class="w-full p-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    <option value="" disabled selected>Please upload files first</option>
+                </select>
+                <span class="text-sm text-gray-500 mt-2 block">
+                    This column should contain unique identifiers for each row (e.g., student IDs, registration numbers).
+                </span>
+            </div>
+
+            <!-- Columns to Merge Selection -->
+            <div class="mb-6">
+                <label class="block text-gray-700 font-semibold mb-2">
+                    Select & Order Columns to Merge
+                </label>
+                <div id="header-list-container" class="header-list-container max-h-64 overflow-y-auto p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <!-- Headers will be dynamically added here -->
+                    <p id="no-headers-message" class="text-gray-400 italic text-center">No headers found yet. Please upload your files.</p>
+                </div>
+                <div class="mt-2 flex items-center">
+                    <input type="checkbox" id="select-all-headers" class="h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded cursor-pointer" checked>
+                    <label for="select-all-headers" class="ml-2 text-sm text-gray-600 font-medium">Select All</label>
+                </div>
+            </div>
+
+            <button id="merge-button"
+                class="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 px-6 rounded-xl transition duration-300 ease-in-out shadow-lg transform hover:scale-105">
+                Merge Sheets
+            </button>
+        </div>
+
+        <!-- Filter Data Section -->
+        <div id="filter-container" class="mb-8 hidden">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
+                Step 3: Filter Data (Optional)
+            </h2>
+            <div class="space-y-4">
+                <!-- Not Null Filter -->
+                <div class="flex items-center">
+                    <input type="checkbox" id="filter-not-null" class="h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded cursor-pointer">
+                    <label for="filter-not-null" class="ml-2 text-sm text-gray-600 font-medium">
+                        Filter out rows with empty values in selected columns
+                    </label>
+                </div>
+                <!-- Category Filter -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2 sm:gap-4">
+                    <div class="flex-1 w-full">
+                        <label for="filter-column-select" class="block text-gray-700 font-semibold mb-1">
+                            Filter by Category
+                        </label>
+                        <select id="filter-column-select" class="w-full p-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
+                            <option value="" disabled selected>Select a column...</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 w-full">
+                        <label for="filter-value-input" class="block text-gray-700 font-semibold mb-1">
+                            Category Value
+                        </label>
+                        <input type="text" id="filter-value-input" placeholder="e.g., CS" class="w-full p-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    </div>
+                </div>
+            </div>
+            <button id="apply-filter-button"
+                class="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 px-6 rounded-xl transition duration-300 ease-in-out shadow-lg transform hover:scale-105">
+                Apply Filters
+            </button>
+        </div>
+        
+        <!-- Merged Data Preview Section -->
+        <div id="preview-container" class="mb-8 hidden">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
+                Step 4: Preview Merged Data
+            </h2>
+            <div class="preview-table-container overflow-x-auto border border-gray-200 rounded-xl shadow-inner">
+                <table id="preview-table" class="min-w-full divide-y divide-gray-200">
+                    <!-- Table content will be dynamically generated here -->
+                </table>
+            </div>
+        </div>
+
+        <!-- Merged Data Display and Actions -->
+        <div id="action-buttons-container" class="flex flex-col sm:flex-row gap-4 mb-8 hidden">
+            <button id="download-excel-button"
+                class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition duration-300 ease-in-out shadow-lg transform hover:scale-105" disabled>
+                Download Excel
+            </button>
+            <button id="download-pdf-button"
+                class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-xl transition duration-300 ease-in-out shadow-lg transform hover:scale-105" disabled>
+                Download PDF
+            </button>
+        </div>
+
+        <!-- Status/Message Box -->
+        <div id="message-box" class="p-4 text-sm rounded-xl transition-all duration-300 ease-in-out hidden" role="alert">
+            <p id="message-text" class="font-medium"></p>
+        </div>
+    </div>
+
+    <!-- SheetJS library from CDN for reading and writing Excel files -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF and autoTable for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        // Use an IIFE (Immediately Invoked Function Expression) to avoid polluting the global scope.
+        (function() {
+            const fileInput = document.getElementById('excel-files');
+            const headerSelectionContainer = document.getElementById('header-selection-container');
+            const primaryKeySelect = document.getElementById('primary-key-select');
+            const headerListContainer = document.getElementById('header-list-container');
+            const noHeadersMessage = document.getElementById('no-headers-message');
+            const selectAllHeadersCheckbox = document.getElementById('select-all-headers');
+            const mergeButton = document.getElementById('merge-button');
+
+            const filterContainer = document.getElementById('filter-container');
+            const filterNotNullCheckbox = document.getElementById('filter-not-null');
+            const filterColumnSelect = document.getElementById('filter-column-select');
+            const filterValueInput = document.getElementById('filter-value-input');
+            const applyFilterButton = document.getElementById('apply-filter-button');
+            
+            const previewContainer = document.getElementById('preview-container');
+            const previewTable = document.getElementById('preview-table');
+            const actionButtonsContainer = document.getElementById('action-buttons-container');
+            const downloadExcelButton = document.getElementById('download-excel-button');
+            const downloadPdfButton = document.getElementById('download-pdf-button');
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+            
+            let allSheetData = []; // Store parsed data from all sheets
+            let initialMergedData = []; // Store the full merged data before filtering
+            let filteredMergedData = []; // Store the final merged data after filtering
+            let finalHeaderOrder = []; // Store the selected and ordered headers
+
+            /**
+             * Normalizes a string by removing spaces, full stops, and slashes, then converting to lowercase.
+             * This is used for consistent matching of header names and primary key values.
+             * @param {string} str - The string to normalize.
+             * @returns {string} The normalized string.
+             */
+            function normalizeString(str) {
+                if (typeof str !== 'string') {
+                    return '';
+                }
+                // Removes spaces, periods, and forward slashes. Then converts to lowercase.
+                return str.replace(/[\s./]/g, '').toLowerCase();
+            }
+
+            /**
+             * Displays a message in the UI.
+             * @param {string} text - The message to display.
+             * @param {string} type - The type of message ('success', 'error', 'info').
+             */
+            function showMessage(text, type) {
+                let classes = {
+                    success: 'bg-green-100 text-green-700',
+                    error: 'bg-red-100 text-red-700',
+                    info: 'bg-blue-100 text-blue-700'
+                };
+                messageBox.className = `p-4 text-sm rounded-xl transition-all duration-300 ease-in-out ${classes[type]}`;
+                messageText.textContent = text;
+                messageBox.classList.remove('hidden');
+            }
+
+            /**
+             * Hides the message box.
+             */
+            function hideMessage() {
+                messageBox.classList.add('hidden');
+            }
+
+            let dragSrcEl = null;
+
+            function handleDragStart(e) {
+                this.classList.add('dragging');
+                dragSrcEl = this;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.innerHTML);
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+
+            function handleDragEnter(e) {
+                this.classList.add('over');
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('over');
+            }
+
+            function handleDrop(e) {
+                e.stopPropagation();
+                if (dragSrcEl !== this) {
+                    const dragSrcContent = dragSrcEl.innerHTML;
+                    const dragSrcOriginalName = dragSrcEl.dataset.originalName;
+                    const dragSrcNormalizedName = dragSrcEl.dataset.normalizedName;
+
+                    dragSrcEl.innerHTML = this.innerHTML;
+                    dragSrcEl.dataset.originalName = this.dataset.originalName;
+                    dragSrcEl.dataset.normalizedName = this.dataset.normalizedName;
+
+                    this.innerHTML = dragSrcContent;
+                    this.dataset.originalName = dragSrcOriginalName;
+                    this.dataset.normalizedName = dragSrcNormalizedName;
+                }
+                return false;
+            }
+
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.draggable-item').forEach(item => {
+                    item.classList.remove('over');
+                });
+            }
+
+            /**
+             * Populates the primary key select dropdown and the header checkboxes.
+             * @param {string[]} headers - A list of unique normalized header names.
+             */
+            function populateHeaderSelection(allUniqueHeaders) {
+                // Populate Primary Key Dropdown
+                primaryKeySelect.innerHTML = '<option value="" disabled selected>Select a primary key...</option>';
+                allUniqueHeaders.forEach(header => {
+                    const option = document.createElement('option');
+                    option.value = header;
+                    option.textContent = header;
+                    primaryKeySelect.appendChild(option);
+                });
+
+                // Populate filter column dropdown
+                filterColumnSelect.innerHTML = '<option value="" disabled selected>Select a column...</option>';
+                allUniqueHeaders.forEach(header => {
+                    const option = document.createElement('option');
+                    option.value = header;
+                    option.textContent = header;
+                    filterColumnSelect.appendChild(option);
+                });
+
+                // Populate column checkboxes
+                headerListContainer.innerHTML = '';
+                allUniqueHeaders.forEach(header => {
+                    const headerItem = document.createElement('div');
+                    headerItem.className = 'draggable-item flex items-center p-2 my-1 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors duration-200';
+                    headerItem.setAttribute('draggable', 'true');
+                    headerItem.dataset.normalizedName = normalizeString(header);
+                    headerItem.dataset.originalName = header;
+
+                    headerItem.innerHTML = `
+                        <input type="checkbox" id="header-${normalizeString(header)}"
+                            class="header-checkbox h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded cursor-pointer"
+                            data-original-name="${header}" checked>
+                        <label for="header-${normalizeString(header)}" class="ml-2 text-sm text-gray-600 flex-1 cursor-grab">
+                            ${header}
+                        </label>
+                    `;
+                    headerItem.addEventListener('dragstart', handleDragStart);
+                    headerItem.addEventListener('dragover', handleDragOver);
+                    headerItem.addEventListener('dragenter', handleDragEnter);
+                    headerItem.addEventListener('dragleave', handleDragLeave);
+                    headerItem.addEventListener('drop', handleDrop);
+                    headerItem.addEventListener('dragend', handleDragEnd);
+
+                    headerListContainer.appendChild(headerItem);
+                });
+            }
+
+            /**
+             * Handles the file upload event, parses the files, and updates the UI with headers.
+             * @param {Event} event - The file input change event.
+             */
+            fileInput.addEventListener('change', async (event) => {
+                const files = event.target.files;
+                if (files.length === 0) {
+                    headerSelectionContainer.classList.add('hidden');
+                    filterContainer.classList.add('hidden');
+                    previewContainer.classList.add('hidden');
+                    actionButtonsContainer.classList.add('hidden');
+                    return;
+                }
+
+                hideMessage();
+                headerListContainer.innerHTML = '';
+                allSheetData = [];
+                initialMergedData = [];
+                filteredMergedData = [];
+                downloadExcelButton.disabled = true;
+                downloadPdfButton.disabled = true;
+                previewContainer.classList.add('hidden');
+                filterContainer.classList.add('hidden');
+                
+                const uniqueHeadersSet = new Set();
+                let hasData = false;
+
+                for (const file of files) {
+                    try {
+                        const data = await file.arrayBuffer();
+                        const workbook = XLSX.read(data, { type: 'array' });
+
+                        // Iterate through each sheet (tab) in the workbook
+                        for (const sheetName of workbook.SheetNames) {
+                            const worksheet = workbook.Sheets[sheetName];
+                            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                            
+                            if (jsonData.length === 0 || jsonData[0].length === 0) {
+                                showMessage(`Skipped empty sheet: ${file.name} - ${sheetName}`, 'info');
+                                continue;
+                            }
+                            
+                            const headers = jsonData[0]; // The first row is the header
+                            allSheetData.push({
+                                file: file.name,
+                                sheet: sheetName,
+                                headers: headers,
+                                data: jsonData.slice(1), // Store rows without the header
+                            });
+                            headers.forEach(header => uniqueHeadersSet.add(header));
+                            hasData = true;
+                        }
+                    } catch (error) {
+                        showMessage(`Error processing file ${file.name}: ${error.message}`, 'error');
+                        console.error(error);
+                    }
+                }
+                
+                // Show the header selection UI if any sheets were processed successfully
+                if (hasData) {
+                    headerSelectionContainer.classList.remove('hidden');
+                    noHeadersMessage.classList.add('hidden');
+                    mergeButton.disabled = false;
+                    
+                    const allUniqueHeaders = [...uniqueHeadersSet].sort((a, b) => a.localeCompare(b));
+                    populateHeaderSelection(allUniqueHeaders);
+                } else {
+                    noHeadersMessage.classList.remove('hidden');
+                    headerSelectionContainer.classList.add('hidden');
+                    actionButtonsContainer.classList.add('hidden');
+                }
+            });
+
+            primaryKeySelect.addEventListener('change', (event) => {
+                const selectedKey = event.target.value;
+                if (selectedKey) {
+                    showMessage(`Primary key set to "${selectedKey}". The application will use this column to merge data from all your sheets.`, 'info');
+                }
+            });
+
+            /**
+             * Selects/deselects all header checkboxes.
+             */
+            selectAllHeadersCheckbox.addEventListener('change', (event) => {
+                const checkboxes = document.querySelectorAll('.header-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = event.target.checked;
+                });
+            });
+
+            /**
+             * Applies filters to the initial merged data and updates the preview.
+             */
+            function applyFilters() {
+                let currentData = [...initialMergedData]; // Start with a fresh copy of the merged data
+
+                // Get selected headers for the not null filter
+                const selectedHeadersForFilter = finalHeaderOrder.filter(header => {
+                    const checkbox = document.querySelector(`.draggable-item [data-original-name="${header}"]`);
+                    return checkbox && checkbox.checked;
+                });
+
+                // Filter 1: Not Null Check
+                if (filterNotNullCheckbox.checked) {
+                    currentData = currentData.filter(row => {
+                        return selectedHeadersForFilter.every(header => {
+                            const value = row[header];
+                            return value !== undefined && value !== null && value !== '';
+                        });
+                    });
+                }
+
+                // Filter 2: Category Filter
+                const filterColumn = filterColumnSelect.value;
+                const filterValue = filterValueInput.value.trim();
+
+                if (filterColumn && filterValue) {
+                    const normalizedFilterValue = normalizeString(filterValue);
+                    currentData = currentData.filter(row => {
+                        const cellValue = row[filterColumn];
+                        if (cellValue) {
+                            return normalizeString(cellValue) === normalizedFilterValue;
+                        }
+                        return false;
+                    });
+                }
+                
+                filteredMergedData = currentData;
+                
+                if (filteredMergedData.length > 0) {
+                    showMessage(`Filters applied. Found ${filteredMergedData.length} matching rows.`, 'success');
+                    downloadExcelButton.disabled = false;
+                    downloadPdfButton.disabled = false;
+                    showPreview(finalHeaderOrder);
+                } else {
+                    showMessage('No data found after applying filters.', 'error');
+                    downloadExcelButton.disabled = true;
+                    downloadPdfButton.disabled = true;
+                    previewContainer.classList.add('hidden');
+                }
+            }
+
+            /**
+             * Handles the merge process when the merge button is clicked.
+             */
+            mergeButton.addEventListener('click', () => {
+                const selectedPrimaryKey = primaryKeySelect.value;
+                if (!selectedPrimaryKey) {
+                    showMessage('Please select a primary key column to merge.', 'info');
+                    return;
+                }
+                
+                const headerCheckboxes = document.querySelectorAll('.draggable-item .header-checkbox:checked');
+                
+                if (headerCheckboxes.length === 0) {
+                    showMessage('Please select at least one header to merge.', 'info');
+                    return;
+                }
+
+                // Get the final ordered list of headers from the UI
+                finalHeaderOrder = [];
+                const draggableItems = document.querySelectorAll('.draggable-item');
+                draggableItems.forEach(item => {
+                    const checkbox = item.querySelector('.header-checkbox');
+                    if (checkbox && checkbox.checked) {
+                        finalHeaderOrder.push(item.dataset.originalName);
+                    }
+                });
+
+                // Ensure the primary key is in the final header list
+                if (!finalHeaderOrder.includes(selectedPrimaryKey)) {
+                    finalHeaderOrder.unshift(selectedPrimaryKey);
+                }
+
+                // Initialize the merged data object
+                const mergedMap = new Map();
+                const normalizedPrimaryKey = normalizeString(selectedPrimaryKey);
+                
+                // Merge data from all sheets based on the primary key
+                allSheetData.forEach(sheet => {
+                    const normalizedHeaders = sheet.headers.map(h => normalizeString(h));
+                    const primaryKeyIndex = normalizedHeaders.indexOf(normalizedPrimaryKey);
+
+                    if (primaryKeyIndex === -1) {
+                         showMessage(`Warning: Primary key column "${selectedPrimaryKey}" not found in sheet: ${sheet.file} - ${sheet.sheet}. This sheet will be skipped.`, 'error');
+                         return;
+                    }
+
+                    sheet.data.forEach(row => {
+                        const primaryKeyValue = row[primaryKeyIndex];
+                        const normalizedPrimaryKeyValue = normalizeString(primaryKeyValue);
+                        
+                        if (normalizedPrimaryKeyValue) {
+                            if (!mergedMap.has(normalizedPrimaryKeyValue)) {
+                                // If this is the first time we see this primary key value,
+                                // initialize a new entry with empty values for all selected headers
+                                const newRow = {};
+                                finalHeaderOrder.forEach(header => newRow[header] = '');
+                                newRow[selectedPrimaryKey] = primaryKeyValue; // Use the original value for display
+                                mergedMap.set(normalizedPrimaryKeyValue, newRow);
+                            }
+                            
+                            // Fill in data for the current row
+                            const existingRow = mergedMap.get(normalizedPrimaryKeyValue);
+                            normalizedHeaders.forEach((normalizedHeader, index) => {
+                                const originalHeaderName = finalHeaderOrder.find(h => normalizeString(h) === normalizedHeader);
+                                if (originalHeaderName && row[index] !== undefined && row[index] !== '') {
+                                    existingRow[originalHeaderName] = row[index];
+                                }
+                            });
+                        }
+                    });
+                });
+                
+                initialMergedData = Array.from(mergedMap.values());
+                filteredMergedData = initialMergedData; // Initially, filtered data is the same as merged data
+
+                if (initialMergedData.length > 0) {
+                    showMessage(`Successfully merged ${initialMergedData.length} unique rows.`, 'success');
+                    downloadExcelButton.disabled = false;
+                    downloadPdfButton.disabled = false;
+                    filterContainer.classList.remove('hidden');
+                    actionButtonsContainer.classList.remove('hidden');
+                    showPreview(finalHeaderOrder);
+                } else {
+                    showMessage('Merge completed, but no data was found. Please check your files.', 'error');
+                    downloadExcelButton.disabled = true;
+                    downloadPdfButton.disabled = true;
+                    previewContainer.classList.add('hidden');
+                    filterContainer.classList.add('hidden');
+                    actionButtonsContainer.classList.add('hidden');
+                }
+            });
+
+            applyFilterButton.addEventListener('click', applyFilters);
+
+            /**
+             * Generates and displays the merged data in a table for preview.
+             * @param {string[]} finalHeaderOrder - The ordered list of headers for the preview.
+             */
+            function showPreview(finalHeaderOrder) {
+                if (filteredMergedData.length === 0) {
+                    previewContainer.classList.add('hidden');
+                    return;
+                }
+                
+                // Clear previous table content
+                previewTable.innerHTML = '';
+
+                // Get headers from the first row of merged data
+                const headers = finalHeaderOrder;
+                
+                // Create table header
+                const tableHead = document.createElement('thead');
+                tableHead.className = 'bg-gray-50';
+                const headerRow = document.createElement('tr');
+                headers.forEach(header => {
+                    const th = document.createElement('th');
+                    th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                    th.textContent = header;
+                    headerRow.appendChild(th);
+                });
+                tableHead.appendChild(headerRow);
+                previewTable.appendChild(tableHead);
+
+                // Create table body
+                const tableBody = document.createElement('tbody');
+                tableBody.className = 'bg-white divide-y divide-gray-200';
+                filteredMergedData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    headers.forEach(header => {
+                        const td = document.createElement('td');
+                        td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900';
+                        td.textContent = row[header];
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                });
+                previewTable.appendChild(tableBody);
+                
+                previewContainer.classList.remove('hidden');
+            }
+
+            /**
+             * Handles the download button click, creating and downloading the new Excel file.
+             */
+            downloadExcelButton.addEventListener('click', () => {
+                if (filteredMergedData.length === 0) {
+                    showMessage('No data to download. Please merge sheets and apply filters first.', 'error');
+                    return;
+                }
+                
+                const selectedHeaders = Object.keys(filteredMergedData[0]); // Get headers from the first row of merged data
+                const ws = XLSX.utils.json_to_sheet(filteredMergedData, { header: selectedHeaders });
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Merged Data");
+                XLSX.writeFile(wb, "merged_excel_data.xlsx");
+
+                showMessage('Your merged Excel file is being downloaded.', 'success');
+            });
+
+            /**
+             * Handles the download button click, creating and downloading the new PDF file.
+             */
+            downloadPdfButton.addEventListener('click', () => {
+                if (filteredMergedData.length === 0) {
+                    showMessage('No data to download. Please merge sheets and apply filters first.', 'error');
+                    return;
+                }
+                
+                // Create a new jsPDF instance
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                const headers = Object.keys(filteredMergedData[0]);
+                const data = filteredMergedData.map(row => headers.map(header => row[header]));
+
+                // Use jspdf-autotable to generate the table
+                doc.autoTable({
+                    head: [headers],
+                    body: data,
+                    startY: 20,
+                    styles: {
+                        fontSize: 8,
+                        cellPadding: 2,
+                        halign: 'left',
+                        valign: 'middle'
+                    },
+                    headStyles: {
+                        fillColor: [243, 244, 246], // light gray
+                        textColor: [55, 65, 81], // dark gray
+                        fontStyle: 'bold'
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 20 } // Adjust width for the first column (e.g., primary key)
+                    },
+                    margin: { top: 10 }
+                });
+
+                doc.save('merged_data.pdf');
+                showMessage('Your merged PDF file is being downloaded.', 'success');
+            });
+
+        })();
+    </script>
+</body>
+</html>
