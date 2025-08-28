@@ -168,7 +168,7 @@
 
     <button id="open-settings-button" class="fixed top-4 right-4 p-2 bg-gray-200 rounded-full shadow-md hover:bg-gray-300 transition-colors z-50">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.942 3.313.842 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.942 1.543-.842 3.313-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.942-3.313-.842-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.942-1.543.842-3.313 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.942 3.313.842 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.942 1.543-.842 3.313-2.37-2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.942-3.313-.842-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.942-1.543.842-3.313 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
     </button>
@@ -413,6 +413,9 @@
                 <button id="close-advanced-download-button" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
+                <button id="download-separate-excels-button" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Download Separate Excels
+                </button>
                 <button id="save-advanced-download-button" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Download Merged Excel
                 </button>
@@ -480,6 +483,7 @@
             const addSheetButton = document.getElementById('add-sheet-button');
             const closeAdvancedDownloadButton = document.getElementById('close-advanced-download-button');
             const saveAdvancedDownloadButton = document.getElementById('save-advanced-download-button');
+            const downloadSeparateExcelsButton = document.getElementById('download-separate-excels-button');
 
             let allSheetData = []; // Store parsed data from all sheets
             let initialMergedData = []; // Store the full merged data before filtering
@@ -1201,47 +1205,50 @@
             });
 
             /**
-             * Validates and downloads the multi-sheet Excel file.
+             * Performs validation on sheet configurations.
+             * @returns {boolean} - True if validation passes, false otherwise.
              */
-            saveAdvancedDownloadButton.addEventListener('click', () => {
+            function validateSheetConfigurations() {
                 if (sheetConfigurations.length === 0) {
                     showMessage('Please add at least one sheet to download.', 'error');
-                    return;
+                    return false;
                 }
 
-                // Validation
                 const sheetNames = new Set();
-                let hasError = false;
-                sheetConfigurations.forEach(sheet => {
+                for (const sheet of sheetConfigurations) {
                     const { name, startRow, endRow } = sheet;
                     if (!name.trim()) {
                         showMessage('Sheet names cannot be empty.', 'error');
-                        hasError = true;
-                        return;
+                        return false;
                     }
                     if (sheetNames.has(name.trim())) {
                         showMessage(`Duplicate sheet name: "${name}". Please use unique names.`, 'error');
-                        hasError = true;
-                        return;
+                        return false;
                     }
                     if (startRow < 1 || startRow > filteredMergedData.length || endRow < 1 || endRow > filteredMergedData.length) {
                         showMessage(`Invalid row range for sheet "${name}". Rows must be between 1 and ${filteredMergedData.length}.`, 'error');
-                        hasError = true;
-                        return;
+                        return false;
                     }
                     if (startRow > endRow) {
                         showMessage(`Start row cannot be greater than end row for sheet "${name}".`, 'error');
-                        hasError = true;
-                        return;
+                        return false;
                     }
                     sheetNames.add(name.trim());
-                });
+                }
+                return true;
+            }
 
-                if (hasError) return;
+            /**
+             * Downloads a single Excel file with multiple sheets.
+             */
+            saveAdvancedDownloadButton.addEventListener('click', () => {
+                if (!validateSheetConfigurations()) {
+                    return;
+                }
 
-                // Create and download the workbook
                 try {
                     const wb = XLSX.utils.book_new();
+                    let hasValidSheets = false;
 
                     sheetConfigurations.forEach(sheet => {
                         const { name, startRow, endRow } = sheet;
@@ -1250,23 +1257,53 @@
                         if (sheetData.length > 0) {
                             const ws = XLSX.utils.json_to_sheet(sheetData);
                             XLSX.utils.book_append_sheet(wb, ws, name);
+                            hasValidSheets = true;
                         } else {
                             showMessage(`Warning: Sheet "${name}" has no data in the specified range and will not be created.`, 'info');
                         }
                     });
 
-                    if (wb.SheetNames.length === 0) {
+                    if (hasValidSheets) {
+                        XLSX.writeFile(wb, "AdvancedMergedData.xlsx");
+                        showMessage('Advanced Excel file downloaded successfully!', 'success');
+                        advancedDownloadModal.classList.remove('open');
+                    } else {
                         showMessage('No valid sheets to download.', 'error');
-                        return;
                     }
-
-                    XLSX.writeFile(wb, "AdvancedMergedData.xlsx");
-                    showMessage('Advanced Excel file downloaded successfully!', 'success');
-                    advancedDownloadModal.classList.remove('open');
 
                 } catch (error) {
                     showMessage('Error downloading advanced Excel file.', 'error');
                     console.error('Advanced Download error:', error);
+                }
+            });
+
+            /**
+             * Downloads each configured sheet as a separate Excel file.
+             */
+            downloadSeparateExcelsButton.addEventListener('click', () => {
+                if (!validateSheetConfigurations()) {
+                    return;
+                }
+
+                try {
+                    sheetConfigurations.forEach(sheet => {
+                        const { name, startRow, endRow } = sheet;
+                        const sheetData = filteredMergedData.slice(startRow - 1, endRow);
+
+                        if (sheetData.length > 0) {
+                            const ws = XLSX.utils.json_to_sheet(sheetData);
+                            const wb = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(wb, ws, name);
+                            XLSX.writeFile(wb, `${name}.xlsx`);
+                        } else {
+                            showMessage(`Warning: Sheet "${name}" has no data in the specified range and will not be downloaded.`, 'info');
+                        }
+                    });
+                    showMessage('Separate Excel files downloaded successfully!', 'success');
+                    advancedDownloadModal.classList.remove('open');
+                } catch (error) {
+                    showMessage('Error downloading separate Excel files.', 'error');
+                    console.error('Separate Download error:', error);
                 }
             });
 
