@@ -14,7 +14,7 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
-            margin-bottom: 50px; 
+            margin-bottom: 50px;
             --primary-color: #8b5cf6;
         }
 
@@ -84,7 +84,7 @@
         }
         
         footer {
-            position: fixed; 
+            position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
@@ -95,7 +95,7 @@
             font-family: Arial, sans-serif;
             font-size: 14px;
             color: #555;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.1); 
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
             z-index: 100;
         }
 
@@ -168,7 +168,7 @@
 
     <button id="open-settings-button" class="fixed top-4 right-4 p-2 bg-gray-200 rounded-full shadow-md hover:bg-gray-300 transition-colors z-50">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.942 3.313.842 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.942 1.543-.842 3.313-2.37-2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.942-3.313-.842-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.942-1.543.842-3.313 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.942 3.313.842 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.942 1.543-.842 3.313-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.942-3.313-.842-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.942-1.543.842-3.313 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
     </button>
@@ -263,7 +263,7 @@
                         <label for="filter-value-input" class="block text-gray-700 font-semibold mb-1">
                             Category Value
                         </label>
-                        <input type="text" id="filter-value-input" placeholder="e.g., CS" class="w-full p-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        <input type="text" id="filter-value-input" placeholder="e.g., S/20/000 🔍" class="w-full p-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
                     </div>
                 </div>
             </div>
@@ -490,6 +490,7 @@
             let filteredMergedData = []; // Store the final merged data after filtering
             let finalHeaderOrder = []; // Store the selected and ordered headers
             let sheetConfigurations = []; // Store configurations for multi-sheet download
+            let normalizedToOriginalHeaderMap = new Map(); // Stores the mapping from normalized headers to their original names.
 
             let siteSettings = {
                 pdfPageSize: 'a4',
@@ -566,7 +567,7 @@
             });
 
             /**
-             * Normalizes a string by removing spaces, full stops, and slashes, then converting to lowercase.
+             * Normalizes a string by removing spaces and periods, then converting to lowercase.
              * This is used for consistent matching of header names and primary key values.
              * @param {string} str - The string to normalize.
              * @returns {string} The normalized string.
@@ -611,7 +612,7 @@
                 this.classList.add('dragging');
                 dragSrcEl = this;
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', this.innerHTML);
+                e.dataTransfer.setData('text/plain', this.dataset.normalizedName); // Use normalized name for data transfer
             }
 
             function handleDragOver(e) {
@@ -670,6 +671,8 @@
                             const th = document.createElement('th');
                             th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
                             th.textContent = item.dataset.originalName;
+                            th.dataset.originalName = item.dataset.originalName;
+                            th.dataset.normalizedName = item.dataset.normalizedName;
                             livePreviewRow.appendChild(th);
                         }
                     });
@@ -685,37 +688,40 @@
             function populateHeaderSelection(allUniqueHeaders) {
                 // Populate Primary Key Dropdown
                 primaryKeySelect.innerHTML = '<option value="" disabled selected>Select a primary key...</option>';
-                allUniqueHeaders.forEach(header => {
+                allUniqueHeaders.forEach(normalizedHeader => {
+                    const originalName = normalizedToOriginalHeaderMap.get(normalizedHeader);
                     const option = document.createElement('option');
-                    option.value = header;
-                    option.textContent = header;
+                    option.value = normalizedHeader;
+                    option.textContent = originalName;
                     primaryKeySelect.appendChild(option);
                 });
 
                 // Populate filter column dropdown
                 filterColumnSelect.innerHTML = '<option value="" disabled selected>Select a column...</option>';
-                allUniqueHeaders.forEach(header => {
+                allUniqueHeaders.forEach(normalizedHeader => {
+                    const originalName = normalizedToOriginalHeaderMap.get(normalizedHeader);
                     const option = document.createElement('option');
-                    option.value = header;
-                    option.textContent = header;
+                    option.value = normalizedHeader;
+                    option.textContent = originalName;
                     filterColumnSelect.appendChild(option);
                 });
 
                 // Populate column checkboxes
                 headerListContainer.innerHTML = '';
-                allUniqueHeaders.forEach(header => {
+                allUniqueHeaders.forEach(normalizedHeader => {
+                    const originalName = normalizedToOriginalHeaderMap.get(normalizedHeader);
                     const headerItem = document.createElement('div');
                     headerItem.className = 'draggable-item flex items-center p-2 my-2 rounded-lg shadow-sm transition-transform duration-200';
                     headerItem.setAttribute('draggable', 'true');
-                    headerItem.dataset.normalizedName = normalizeString(header);
-                    headerItem.dataset.originalName = header;
+                    headerItem.dataset.normalizedName = normalizedHeader;
+                    headerItem.dataset.originalName = originalName;
 
                     headerItem.innerHTML = `
-                        <input type="checkbox" id="header-${normalizeString(header)}"
+                        <input type="checkbox" id="header-${normalizedHeader}"
                             class="header-checkbox h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded cursor-pointer"
-                            data-original-name="${header}" checked>
-                        <label for="header-${normalizeString(header)}" class="ml-2 text-sm text-gray-800 flex-1 cursor-grab">
-                            ${header}
+                            data-normalized-name="${normalizedHeader}" checked>
+                        <label for="header-${normalizedHeader}" class="ml-2 text-sm text-gray-800 flex-1 cursor-grab">
+                            ${originalName}
                         </label>
                     `;
                     headerItem.addEventListener('dragstart', handleDragStart);
@@ -724,6 +730,7 @@
                     headerItem.addEventListener('dragleave', handleDragLeave);
                     headerItem.addEventListener('drop', handleDrop);
                     headerItem.addEventListener('dragend', handleDragEnd);
+                    headerItem.addEventListener('dblclick', handleHeaderRename);
 
                     headerListContainer.appendChild(headerItem);
                 });
@@ -756,13 +763,13 @@
                 allSheetData = [];
                 initialMergedData = [];
                 filteredMergedData = [];
+                normalizedToOriginalHeaderMap = new Map();
                 downloadExcelButton.disabled = true;
                 downloadPdfButton.disabled = true;
                 advancedDownloadButton.disabled = true;
                 previewContainer.classList.add('hidden');
                 filterContainer.classList.add('hidden');
                 
-                const uniqueHeadersSet = new Set();
                 let hasData = false;
 
                 for (const file of files) {
@@ -781,13 +788,23 @@
                             }
                             
                             const headers = jsonData[0]; // The first row is the header
+                            const normalizedHeaders = headers.map(h => normalizeString(h));
+                            
+                            // Build the normalized-to-original header map
+                            headers.forEach(header => {
+                                const normalized = normalizeString(header);
+                                if (!normalizedToOriginalHeaderMap.has(normalized)) {
+                                    normalizedToOriginalHeaderMap.set(normalized, header);
+                                }
+                            });
+                            
                             allSheetData.push({
                                 file: file.name,
                                 sheet: sheetName,
                                 headers: headers,
+                                normalizedHeaders: normalizedHeaders,
                                 data: jsonData.slice(1), // Store rows without the header
                             });
-                            headers.forEach(header => uniqueHeadersSet.add(header));
                             hasData = true;
                         }
                     } catch (error) {
@@ -802,7 +819,11 @@
                     noHeadersMessage.classList.add('hidden');
                     mergeButton.disabled = false;
                     
-                    const allUniqueHeaders = [...uniqueHeadersSet].sort((a, b) => a.localeCompare(b));
+                    const allUniqueHeaders = [...normalizedToOriginalHeaderMap.keys()].sort((a, b) => {
+                        const originalA = normalizedToOriginalHeaderMap.get(a);
+                        const originalB = normalizedToOriginalHeaderMap.get(b);
+                        return originalA.localeCompare(originalB);
+                    });
                     populateHeaderSelection(allUniqueHeaders);
                 } else {
                     noHeadersMessage.classList.remove('hidden');
@@ -812,7 +833,7 @@
             });
 
             primaryKeySelect.addEventListener('change', (event) => {
-                const selectedKey = event.target.value;
+                const selectedKey = normalizedToOriginalHeaderMap.get(event.target.value);
                 if (selectedKey) {
                     showMessage(`Primary key set to "${selectedKey}". The application will use this column to merge data from all your sheets.`, 'info');
                 }
@@ -839,35 +860,85 @@
             });
 
             /**
+             * Handles renaming of headers via double-click.
+             */
+            function handleHeaderRename(e) {
+                const item = e.currentTarget;
+                const label = item.querySelector('label');
+                const currentName = label.textContent.trim();
+                const normalizedName = item.dataset.normalizedName;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentName;
+                input.className = 'w-full p-1 border rounded-md text-sm';
+                
+                label.style.display = 'none';
+                item.appendChild(input);
+
+                input.focus();
+
+                const saveRename = () => {
+                    const newName = input.value.trim();
+                    if (newName && newName !== currentName) {
+                        label.textContent = newName;
+                        item.dataset.originalName = newName;
+                        
+                        // Update the map to store the new name
+                        normalizedToOriginalHeaderMap.set(normalizedName, newName);
+
+                        // Also update the checkbox's data attribute and ID
+                        const checkbox = item.querySelector('.header-checkbox');
+                        checkbox.id = `header-${normalizedName}`;
+                        label.htmlFor = `header-${normalizedName}`;
+                        
+                        // Update the primary key select if this header was selected
+                        if (primaryKeySelect.value === normalizedName) {
+                            primaryKeySelect.querySelector(`option[value="${normalizedName}"]`).textContent = newName;
+                        }
+                        
+                        showMessage(`Header renamed to "${newName}".`, 'success');
+                    }
+                    input.remove();
+                    label.style.display = 'block';
+                    updateLivePreview();
+                };
+
+                input.addEventListener('blur', saveRename);
+                input.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        saveRename();
+                    }
+                });
+            }
+
+            /**
              * Applies filters to the initial merged data and updates the preview.
              */
             function applyFilters() {
                 let currentData = [...initialMergedData]; // Start with a fresh copy of the merged data
-
+                
                 // Get selected headers for the not null filter
-                const selectedHeadersForFilter = finalHeaderOrder.filter(header => {
-                    const checkbox = document.querySelector(`.draggable-item [data-original-name="${header}"]`);
-                    return checkbox && checkbox.checked;
-                });
+                const selectedHeadersForFilter = finalHeaderOrder;
 
                 // Filter 1: Not Null Check
                 if (filterNotNullCheckbox.checked) {
                     currentData = currentData.filter(row => {
-                        return selectedHeadersForFilter.every(header => {
-                            const value = row[header];
+                        return selectedHeadersForFilter.every(normalizedHeader => {
+                            const value = row[normalizedHeader];
                             return value !== undefined && value !== null && value !== '';
                         });
                     });
                 }
 
                 // Filter 2: Category Filter
-                const filterColumn = filterColumnSelect.value;
+                const filterNormalizedColumn = filterColumnSelect.value;
                 const filterValue = filterValueInput.value.trim();
 
-                if (filterColumn && filterValue) {
+                if (filterNormalizedColumn && filterValue) {
                     const normalizedFilterValue = normalizeString(filterValue);
                     currentData = currentData.filter(row => {
-                        const cellValue = row[filterColumn];
+                        const cellValue = row[filterNormalizedColumn];
                         if (cellValue) {
                             return normalizeString(cellValue) === normalizedFilterValue;
                         }
@@ -909,13 +980,13 @@
                     return;
                 }
 
-                // Get the final ordered list of headers from the UI
+                // Get the final ordered list of *normalized* headers from the UI
                 finalHeaderOrder = [];
                 const draggableItems = document.querySelectorAll('.draggable-item');
                 draggableItems.forEach(item => {
                     const checkbox = item.querySelector('.header-checkbox');
                     if (checkbox && checkbox.checked) {
-                        finalHeaderOrder.push(item.dataset.originalName);
+                        finalHeaderOrder.push(item.dataset.normalizedName);
                     }
                 });
 
@@ -924,17 +995,15 @@
                     finalHeaderOrder.unshift(selectedPrimaryKey);
                 }
 
-                // Initialize the merged data object
+                // Initialize the merged data map
                 const mergedMap = new Map();
-                const normalizedPrimaryKey = normalizeString(selectedPrimaryKey);
                 
                 // Merge data from all sheets based on the primary key
                 allSheetData.forEach(sheet => {
-                    const normalizedHeaders = sheet.headers.map(h => normalizeString(h));
-                    const primaryKeyIndex = normalizedHeaders.indexOf(normalizedPrimaryKey);
+                    const primaryKeyIndex = sheet.normalizedHeaders.indexOf(selectedPrimaryKey);
 
                     if (primaryKeyIndex === -1) {
-                         showMessage(`Warning: Primary key column "${selectedPrimaryKey}" not found in sheet: ${sheet.file} - ${sheet.sheet}. This sheet will be skipped.`, 'error');
+                         showMessage(`Warning: Primary key column "${normalizedToOriginalHeaderMap.get(selectedPrimaryKey)}" not found in sheet: ${sheet.file} - ${sheet.sheet}. This sheet will be skipped.`, 'error');
                          return;
                     }
 
@@ -947,17 +1016,16 @@
                                 // If this is the first time we see this primary key value,
                                 // initialize a new entry with empty values for all selected headers
                                 const newRow = {};
-                                finalHeaderOrder.forEach(header => newRow[header] = '');
+                                finalHeaderOrder.forEach(normalizedHeader => newRow[normalizedHeader] = '');
                                 newRow[selectedPrimaryKey] = primaryKeyValue; // Use the original value for display
                                 mergedMap.set(normalizedPrimaryKeyValue, newRow);
                             }
                             
                             // Fill in data for the current row
                             const existingRow = mergedMap.get(normalizedPrimaryKeyValue);
-                            normalizedHeaders.forEach((normalizedHeader, index) => {
-                                const originalHeaderName = finalHeaderOrder.find(h => normalizeString(h) === normalizedHeader);
-                                if (originalHeaderName && row[index] !== undefined && row[index] !== '') {
-                                    existingRow[originalHeaderName] = row[index];
+                            sheet.normalizedHeaders.forEach((normalizedHeader, index) => {
+                                if (finalHeaderOrder.includes(normalizedHeader) && row[index] !== undefined && row[index] !== '') {
+                                    existingRow[normalizedHeader] = row[index];
                                 }
                             });
                         }
@@ -990,9 +1058,9 @@
 
             /**
              * Generates and displays the merged data in a table for preview.
-             * @param {string[]} finalHeaderOrder - The ordered list of headers for the preview.
+             * @param {string[]} normalizedHeaders - The ordered list of normalized headers for the preview.
              */
-            function showPreview(finalHeaderOrder) {
+            function showPreview(normalizedHeaders) {
                 if (filteredMergedData.length === 0) {
                     previewContainer.classList.add('hidden');
                     return;
@@ -1002,9 +1070,6 @@
                 previewTable.innerHTML = '';
                 advancedPreviewTable.innerHTML = '';
 
-                // Get headers from the first row of merged data
-                const headers = finalHeaderOrder;
-                
                 // Create table header
                 const tableHead = document.createElement('thead');
                 tableHead.className = 'bg-gray-50';
@@ -1013,10 +1078,11 @@
                 rowNumberTh.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50';
                 rowNumberTh.textContent = '#';
                 headerRow.appendChild(rowNumberTh);
-                headers.forEach(header => {
+                normalizedHeaders.forEach(normalizedHeader => {
+                    const originalHeaderName = normalizedToOriginalHeaderMap.get(normalizedHeader);
                     const th = document.createElement('th');
                     th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
-                    th.textContent = header;
+                    th.textContent = originalHeaderName;
                     headerRow.appendChild(th);
                 });
                 tableHead.appendChild(headerRow);
@@ -1033,10 +1099,10 @@
                     rowNumberTd.className = 'px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900 sticky left-0 bg-white';
                     rowNumberTd.textContent = index + 1;
                     tr.appendChild(rowNumberTd);
-                    headers.forEach(header => {
+                    normalizedHeaders.forEach(normalizedHeader => {
                         const td = document.createElement('td');
                         td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900';
-                        td.textContent = row[header] !== undefined ? row[header] : '';
+                        td.textContent = row[normalizedHeader] !== undefined ? row[normalizedHeader] : '';
                         tr.appendChild(td);
                     });
                     tableBody.appendChild(tr);
@@ -1058,7 +1124,16 @@
                 }
                 
                 try {
-                    const ws = XLSX.utils.json_to_sheet(filteredMergedData);
+                    const formattedData = filteredMergedData.map(row => {
+                        const newRow = {};
+                        finalHeaderOrder.forEach(normalizedHeader => {
+                            const originalName = normalizedToOriginalHeaderMap.get(normalizedHeader);
+                            newRow[originalName] = row[normalizedHeader];
+                        });
+                        return newRow;
+                    });
+                    
+                    const ws = XLSX.utils.json_to_sheet(formattedData);
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, "MergedData");
                     XLSX.writeFile(wb, "MergedExcelData.xlsx");
@@ -1081,8 +1156,9 @@
                 try {
                     const { jsPDF } = window.jspdf;
                     const doc = new jsPDF(siteSettings.pdfOrientation, 'pt', siteSettings.pdfPageSize);
-                    const headers = finalHeaderOrder.map(header => [header]);
-                    const data = filteredMergedData.map(row => finalHeaderOrder.map(header => row[header] !== undefined ? row[header] : ''));
+                    
+                    const headers = finalHeaderOrder.map(normalizedHeader => normalizedToOriginalHeaderMap.get(normalizedHeader));
+                    const data = filteredMergedData.map(row => finalHeaderOrder.map(normalizedHeader => row[normalizedHeader] !== undefined ? row[normalizedHeader] : ''));
                     
                     doc.autoTable({
                         head: [headers],
@@ -1255,7 +1331,16 @@
                         const sheetData = filteredMergedData.slice(startRow - 1, endRow);
                         
                         if (sheetData.length > 0) {
-                            const ws = XLSX.utils.json_to_sheet(sheetData);
+                            const formattedData = sheetData.map(row => {
+                                const newRow = {};
+                                finalHeaderOrder.forEach(normalizedHeader => {
+                                    const originalName = normalizedToOriginalHeaderMap.get(normalizedHeader);
+                                    newRow[originalName] = row[normalizedHeader];
+                                });
+                                return newRow;
+                            });
+
+                            const ws = XLSX.utils.json_to_sheet(formattedData);
                             XLSX.utils.book_append_sheet(wb, ws, name);
                             hasValidSheets = true;
                         } else {
@@ -1291,7 +1376,15 @@
                         const sheetData = filteredMergedData.slice(startRow - 1, endRow);
 
                         if (sheetData.length > 0) {
-                            const ws = XLSX.utils.json_to_sheet(sheetData);
+                            const formattedData = sheetData.map(row => {
+                                const newRow = {};
+                                finalHeaderOrder.forEach(normalizedHeader => {
+                                    const originalName = normalizedToOriginalHeaderMap.get(normalizedHeader);
+                                    newRow[originalName] = row[normalizedHeader];
+                                });
+                                return newRow;
+                            });
+                            const ws = XLSX.utils.json_to_sheet(formattedData);
                             const wb = XLSX.utils.book_new();
                             XLSX.utils.book_append_sheet(wb, ws, name);
                             XLSX.writeFile(wb, `${name}.xlsx`);
